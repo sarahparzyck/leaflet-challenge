@@ -1,7 +1,18 @@
+// Create marker size
 function Markersize(magnitude){
     if(magnitude > 0) {
         return magnitude * 15000;
     } else {return 0}
+}
+
+//Create marker color
+function Markercolor(magnitude) {
+    return magnitude > 5  ? '#f4005c' :
+           magnitude > 4  ? '#e0005c' :
+           magnitude > 3  ? '#c8005c' :
+           magnitude > 2  ? '#ac005c' :
+           magnitude > 1  ? '#91005c' :
+                            '#78005c';
 }
 
 function createFeatures(earthquakeData) {
@@ -10,18 +21,18 @@ function createFeatures(earthquakeData) {
     function onEachFeature(feature, layer) {
         layer.bindPopup("<h3>" + feature.properties.place +
         "</h3><hr><p>" + new Date(feature.properties.time) + "</p>");
-        
+    }
     // Create a GeoJSON layer containing the features array on the earthquakeData object
     // Run the onEachFeature function once for each piece of data in the array
     var earthquakes = L.geoJSON(earthquakeData, {
         pointToLayer: function(earthquakeData, latlng) {
         // Add circles to map
             return L.circle(latlng, {
-                fillOpacity: 0.75,
+                fillOpacity: 1,
                 color: "white",
-                fillColor: "yellow",
+                fillColor: Markercolor(earthquakeData.properties.mag),
                 // Adjust radius
-                radius: Markersize(feature.properties.mag)
+                radius: Markersize(earthquakeData.properties.mag)
             });
         },   
         onEachFeature: onEachFeature
@@ -29,17 +40,15 @@ function createFeatures(earthquakeData) {
 
     // Sending our earthquakes layer to the createMap function
     createMap(earthquakes);
-}}
+}
 
 function createMap(earthquakes) {
     // Create the tile layer that will be the background of our map
-    var streetmap = L.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}", {
+    var streetmap = L.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1Ijoic3Bhcnp5Y2siLCJhIjoiY2tlYWxiNnI4MDFveTJzcXliczMzYmxpZCJ9.bbmbV29NnHcng_ss1QRsgQ", {
         attribution: "© <a href='https://www.mapbox.com/about/maps/'>Mapbox</a> © <a href='http://www.openstreetmap.org/copyright'>OpenStreetMap</a> <strong><a href='https://www.mapbox.com/map-feedback/' target='_blank'>Improve this map</a></strong>",
-        tileSize: 512,
         maxZoom: 18,
-        zoomOffset: -1,
         id: "mapbox/streets-v11",
-        accessToken: "pk.eyJ1Ijoic3Bhcnp5Y2siLCJhIjoiY2tlYWxiNnI4MDFveTJzcXliczMzYmxpZCJ9.bbmbV29NnHcng_ss1QRsgQ"
+        
     });   
 
     // Define a baseMaps object to hold our base layers
@@ -63,8 +72,36 @@ function createMap(earthquakes) {
     L.control.layers(baseMaps, overlayMaps, {
       collapsed: false
     }).addTo(myMap);
-  }
+
+    // Create a magnitude legend
+    var legend = L.control({position: 'bottomleft'});
+
+    legend.onAdd = function (myMap) {
+
+        var div = L.DomUtil.create('div', 'info legend');
+            labels = ['<strong>Magnitude</strong>'],
+            magnitude = ['0-1','1-2','2-3','3-4','4-5','5+'];
+            color_values = ['0.5', '1.5', '2.5', '3.5', '4.5', '5.5']
+
+        for (var i = 0; i < color_values.length; i++) {
+            div.innerHTML += 
+            labels.push(
+                '<i style="background:' + Markercolor(color_values[i]) + '"></i> ' +
+                (magnitude[i] ? magnitude[i] : '+'));
+        }
+
+        div.innerHTML = labels.join('<br>');
+    return div;
+    };
+
+    legend.addTo(myMap);
+}
 
 
-// Perform an API call to the Earthquake API to get earthquake information. Call createMarkers when complete
-d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson", createFeatures);
+// Perform an API call to the Earthquake API to get earthquake information. Call createFeatures when complete
+(async function(){
+    const queryUrl = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson"
+    const data = await d3.json(queryUrl);
+    // Once we get a response, send the data.features object to the createFeatures function
+    createFeatures(data.features);
+})()
